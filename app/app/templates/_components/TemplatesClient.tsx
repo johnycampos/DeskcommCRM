@@ -4,6 +4,7 @@ import { useT } from "@/hooks/i18n/useT";
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Image as ImageIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,17 +81,29 @@ export function TemplatesClient({ canShare, currentUserId }: Props) {
             const canModify =
               template.owner_user_id === currentUserId ||
               (template.owner_user_id === null && canShare);
+            const mediaCount = template.media?.length ?? 0;
             return (
               <li
                 key={template.id}
                 className="flex items-start justify-between gap-4 rounded-md border bg-card p-4"
               >
                 <div className="min-w-0 space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{template.title}</span>
                     <Badge variant={template.owner_user_id ? "neutral" : "default"}>
                       {t(template.owner_user_id ? "Pessoal" : "Compartilhado")}
                     </Badge>
+                    {template.shortcut && (
+                      <Badge variant="outline" className="text-xs font-mono">
+                        /{template.shortcut}
+                      </Badge>
+                    )}
+                    {mediaCount > 0 && (
+                      <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+                        <ImageIcon className="size-3" />
+                        {mediaCount === 1 ? t("1 anexo") : `${mediaCount} ${t("anexos")}`}
+                      </Badge>
+                    )}
                   </div>
                   <p className="line-clamp-2 text-sm text-muted-foreground">{template.body}</p>
                 </div>

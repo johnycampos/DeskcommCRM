@@ -362,4 +362,5 @@ To re-apply on a fresh Supabase project, replay the migrations in version order 
 
 | `20260911050000` | `0233_fn_expurgar_nonces_parametro_errado` | `fn_expurgar_nonces_de_oauth` (0190) nasceu com parâmetros `p_dias, p_lote` — diferente das três irmãs de retenção (`p_retencao_dias, p_limite`), e o cron `data-retention` chama as quatro pelos mesmos nomes de argumento. PostgREST casa função por nome + nomes de argumento numa chamada nomeada; sem overload compatível, a quarta poda falhava toda rodada com "Could not find the function ... in the schema cache" — medido em produção (instalação real, log do app). Renomeia os parâmetros para bater com as irmãs; comportamento e piso de 1 dia preservados. Forward-fix da 0190/0192. |
 
-| `20260919010000` | `0234_ttl_handoff_humano` | Substitui `bot_silenced_until = 'infinity'` por `now() + interval '2 hours'` em `fn_conversation_assign` para evitar que a omissão de desatribuição pelo atendente silencie a IA indefinidamente em novos contatos do cliente. Forward-fix e backfill defensivo de 'infinity' residual. |
+| `20260920000000` | `0343_message_template_media` | Cria tabela `message_template_media` para suporte a anexos de mídia (imagens e vídeos) em templates de mensagem, com RLS espelhando `message_templates`. |
+

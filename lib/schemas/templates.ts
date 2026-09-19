@@ -1,11 +1,22 @@
 import { z } from "zod";
 
+export const templateMediaInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  storage_path: z.string().trim().min(1),
+  media_mime: z.string().trim().min(1),
+  media_size_bytes: z.number().int().nonnegative(),
+  filename: z.string().trim().nullable().optional(),
+  position: z.number().int().nonnegative().optional(),
+});
+export type TemplateMediaInput = z.infer<typeof templateMediaInputSchema>;
+
 export const createTemplateSchema = z.object({
   title: z.string().trim().min(1).max(80),
   body: z.string().trim().min(1).max(4096),
   shortcut: z.string().trim().min(1).max(40).optional(),
   /** true = compartilhado da org (owner null, exige manager+); false = pessoal. */
   shared: z.boolean().default(false),
+  media: z.array(templateMediaInputSchema).optional(),
 });
 export type CreateTemplateInput = z.infer<typeof createTemplateSchema>;
 
@@ -14,6 +25,7 @@ export const updateTemplateSchema = z
     title: z.string().trim().min(1).max(80),
     body: z.string().trim().min(1).max(4096),
     shortcut: z.string().trim().min(1).max(40).nullable(),
+    media: z.array(templateMediaInputSchema).optional(),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, { message: "Informe ao menos um campo." });

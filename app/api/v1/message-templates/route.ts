@@ -1,10 +1,8 @@
 import { requireSupportWrite } from "@/lib/impersonate/support";
 /**
  * GET  /api/v1/message-templates — lista os templates visíveis (pessoais + compartilhados
- *      da org ativa; a RLS `message_templates_select` já filtra).
- * POST /api/v1/message-templates — cria um template. `shared=true` grava owner_user_id
- *      null (compartilhado) e exige role manager+; `shared=false` (default) grava
- *      owner_user_id = user.id (pessoal, role agent+ já garantido pelo requireRole).
+ *      da org ativa; a RLS `message_templates_select` já filtra). Inclui mídias anexadas.
+ * POST /api/v1/message-templates — cria um template com texto e mídias opcionais.
  */
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
@@ -21,7 +19,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
 const COLS =
-  "id, organization_id, owner_user_id, title, body, shortcut, created_by_user_id, created_at, updated_at";
+  "id, organization_id, owner_user_id, title, body, shortcut, created_by_user_id, created_at, updated_at, media:message_template_media(id, storage_path, media_mime, media_size_bytes, filename, position)";
 /** Tag do endpoint no recibo de idempotência. Muda de rota muda de recibo. */
 const ENDPOINT = "/api/v1/message-templates";
 
@@ -38,8 +36,29 @@ export async function GET(_req: NextRequest): Promise<Response> {
     .select(COLS)
     .eq("organization_id", org.orgId)
     .order("updated_at", { ascending: false });
-  if (error) return fail("internal_error", "Erro ao listar templates.", 500, { requestId });
-  return ok(data ?? [], { requestId });
+
+  if (error) {
+    // Fallback gracioso se a tabela message_template_media ainda não tiver migrations aplicadas
+    const fallback = await supabase
+      .from("message_templates")
+      .select("id, organization_id, owner_user_id, title, body, shortcut, created_by_user_id, created_at, updated_at")
+      .eq("organization_id", org.orgId)
+      .order("updated_at", { ascending: false });
+    if (fallback.error) return fail("internal_error", "Erro ao listar templates.", 500, { requestId });
+    return ok(fallback.data ?? [], { requestId });
+  }
+
+  // Ordena as mídias por position internamente em cada template
+  const formatted = (data ?? []).map((t) => {
+    const rawMedia = Array.isArray(t.media) ? t.media : [];
+    const sortedMedia = [...rawMedia].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    return {
+      ...t,
+      media: sortedMedia,
+    };
+  });
+
+  return ok(formatted, { requestId });
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -60,13 +79,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       details: parsed.error.flatten().fieldErrors as Record<string, unknown>,
     });
   }
-  const { title, body, shortcut, shared } = parsed.data;
-  // Compartilhado exige manager+. requireRole já resolveu o role efetivo do
-  // banco em org.role — reusar em vez de uma 2ª chamada/RPC. A RLS with_check
-  // barra de qualquer forma; isto só dá um erro claro antes do insert.
+  const { title, body, shortcut, shared, media } = parsed.data;
+
   if (shared && !roleAtLeast(org.role, "manager")) {
     return fail("forbidden", t("Só manager+ cria template compartilhado."), 403, { requestId });
   }
+
   // Idempotency-Key, quando vem, tem de ser UUID — mesma régua de
   // `admin/tenants` e do contrato (spec 01 §7.3). Chave malformada não vira
   // recibo: recusar cedo é mais honesto que gravar lixo e devolver 201.
@@ -93,9 +111,29 @@ export async function POST(req: NextRequest): Promise<Response> {
         shortcut: shortcut ?? null,
         created_by_user_id: user.id,
       })
-      .select(COLS)
+      .select("id, organization_id, owner_user_id, title, body, shortcut, created_by_user_id, created_at, updated_at")
       .single();
     if (error || !data) throw new Error("Erro ao criar template.");
+
+    let insertedMedia: Array<{ id: string; storage_path: string; media_mime: string; media_size_bytes: number; filename: string | null; position: number }> = [];
+    if (media && media.length > 0) {
+      const mediaRows = media.map((m, idx) => ({
+        template_id: data.id,
+        organization_id: org.orgId,
+        storage_path: m.storage_path,
+        media_mime: m.media_mime,
+        media_size_bytes: m.media_size_bytes,
+        filename: m.filename ?? null,
+        position: m.position ?? idx,
+      }));
+      const { data: mediaResult, error: mediaErr } = await supabase
+        .from("message_template_media")
+        .insert(mediaRows)
+        .select("id, storage_path, media_mime, media_size_bytes, filename, position");
+      if (!mediaErr && mediaResult) {
+        insertedMedia = mediaResult;
+      }
+    }
 
     void audit({
       action: "template.created",
@@ -104,9 +142,9 @@ export async function POST(req: NextRequest): Promise<Response> {
       resourceType: "message_template",
       resourceId: data.id,
       requestId,
-      metadata: { shared, title },
+      metadata: { shared, title, media_count: insertedMedia.length },
     });
-    return data;
+    return { ...data, media: insertedMedia };
   }
 
   // Sem a chave, o caminho é o de sempre: uma chave só existe quando quem

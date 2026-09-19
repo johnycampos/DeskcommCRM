@@ -484,7 +484,12 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         )}
         {selectedConversation ? (
           <>
-            <ConversationHeader conversation={selectedConversation} />
+            <ConversationHeader
+              conversation={selectedConversation}
+              disabled={selectedConversation.status === "closed"}
+              blockedReason={supportReadonly ? "Acompanhamento somente leitura" : blockedReason}
+              janelaFechada={motivoDaJanela}
+            />
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatThread
                 conversationId={selectedConversation.id}

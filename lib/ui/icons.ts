@@ -143,4 +143,5 @@ export {
   GoogleLogo,
   MapPin,
   ArrowsOutSimple,
+  BookmarkSimple,
 } from "@phosphor-icons/react/dist/ssr";

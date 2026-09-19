@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
-import { Phone, ArrowRight } from "@/lib/ui/icons";
+import { Phone, ArrowRight, BookmarkSimple } from "@/lib/ui/icons";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useReleaseConversation } from "@/hooks/inbox/useReleaseConversation";
@@ -21,12 +21,16 @@ import { OwnerBadge } from "@/components/kanban/OwnerBadge";
 import { comandoDaConversa, ROTULO_DO_MOTIVO } from "@/lib/inbox/comando-da-conversa";
 import { ReassignDialog } from "@/components/inbox/ReassignDialog";
 import { SnoozeButton } from "@/components/inbox/SnoozeButton";
+import { SavedMessagesDialog } from "@/components/inbox/SavedMessagesDialog";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 
 interface Props {
   conversation: ConversationWithContact;
+  disabled?: boolean;
+  blockedReason?: string | null;
+  janelaFechada?: string | null;
 }
 
 /**
@@ -55,7 +59,12 @@ const STATUS_LABEL: Record<string, string> = {
   archived: "Arquivada",
 };
 
-export function ConversationHeader({ conversation }: Props) {
+export function ConversationHeader({
+  conversation,
+  disabled = false,
+  blockedReason = null,
+  janelaFechada = null,
+}: Props) {
   const t = useT();
   const { user } = useAuth();
   const claim = useClaimConversation();
@@ -69,6 +78,7 @@ export function ConversationHeader({ conversation }: Props) {
   // atendendo em instalação que nunca configurou agente nenhum.
   const automaticoDaOrg = useAutomaticoAtivo();
   const [reassignOpen, setReassignOpen] = useState(false);
+  const [savedMessagesOpen, setSavedMessagesOpen] = useState(false);
 
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
@@ -76,6 +86,11 @@ export function ConversationHeader({ conversation }: Props) {
   const status = conversation.status;
   const isMineAssigned = conversation.assigned_to_user_id === user.id;
   const isOpen = status === "open" || conversation.assigned_to_user_id == null;
+
+  /**
+   * Trava de envio direto e composer unificada.
+   */
+  const respostaBarrada = disabled || !!blockedReason || !!janelaFechada;
 
   /**
    * QUEM MANDA, uma pergunta com uma resposta.
@@ -235,16 +250,39 @@ export function ConversationHeader({ conversation }: Props) {
             {t("Liberar")}
           </Button>
         )}
+
+        {/* Botão de Mensagens Salvas (envio direto ao cliente) */}
+        {!encerrada && (
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="botao-mensagens-salvas"
+            disabled={respostaBarrada}
+            title={
+              blockedReason
+                ? blockedReason
+                : janelaFechada
+                  ? janelaFechada
+                  : t("Enviar mensagem salva / resposta rápida ao cliente.")
+            }
+            onClick={() => setSavedMessagesOpen(true)}
+            className="gap-1.5"
+          >
+            <BookmarkSimple size={14} weight="bold" aria-hidden />
+            {t("Mensagens salvas")}
+          </Button>
+        )}
+
         {/* O INTERRUPTOR. Um botão, dois rótulos, um slot.
             Fica ANTES de transferir/fechar porque é a ação que a pessoa procura
             quando terminou o que tinha para fazer aqui.
-
+            
             Dois botões lado a lado foi medido e recusado: a barra de ações já
             estourou a caixa útil de 392px em 1280px uma vez (ver o comentário no
             topo do JSX), e um botão a mais custa ~85px — o cabeçalho ganharia uma
             segunda fileira justo na largura mais apertada. Os dois estados são
             mutuamente exclusivos, então nunca precisam existir juntos.
-
+            
             O `data-testid` do lado de VOLTA é o mesmo de antes: `escalacao-ciclo`
             o clica, e rótulo/testid visível é contrato. */}
         {podeDevolver && (
@@ -374,6 +412,14 @@ export function ConversationHeader({ conversation }: Props) {
         conversationId={conversation.id}
         open={reassignOpen}
         onOpenChange={setReassignOpen}
+      />
+      <SavedMessagesDialog
+        open={savedMessagesOpen}
+        onOpenChange={setSavedMessagesOpen}
+        conversationId={conversation.id}
+        contactName={c?.name ?? null}
+        disabled={disabled}
+        blockedReason={blockedReason || janelaFechada}
       />
     </div>
   );

@@ -3,15 +3,26 @@ import { usePermission } from "@/hooks/auth/AuthProvider";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 
+export interface TemplateMedia {
+  id?: string;
+  storage_path: string;
+  media_mime: string;
+  media_size_bytes: number;
+  filename?: string | null;
+  position?: number;
+  url?: string | null;
+}
+
 export interface MessageTemplate {
   id: string;
   title: string;
   body: string;
   shortcut: string | null;
   owner_user_id: string | null;
+  media?: TemplateMedia[];
 }
 
-/** Onda 5: templates de script (pessoais + compartilhados) para o slash-menu do composer. */
+/** Templates de script (pessoais + compartilhados) para o slash-menu do composer e mensagens salvas. */
 export function useMessageTemplates() {
   const podeConsultar = usePermission("message-templates.view");
   return useQuery({
