@@ -103,6 +103,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
     }
 
     // 3. Com a inserção confirmada, deleta mídias antigas do banco
+    let dbDeleteSuccess = true;
     if (oldMediaIds.length > 0) {
       const { error: delErr } = await supabase
         .from("message_template_media")
@@ -110,6 +111,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
         .in("id", oldMediaIds)
         .eq("organization_id", org.orgId);
       if (delErr) {
+        dbDeleteSuccess = false;
         logger.warn("[message-templates/patch] Falha ao excluir referências antigas de mídia no banco", {
           templateId: id,
           error: delErr.message,
@@ -118,19 +120,21 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
       }
     }
 
-    // 4. Limpa do Storage apenas os arquivos físicos que não estão mais presentes
-    const newPaths = new Set(media.map((m) => m.storage_path));
-    const pathsToDelete = oldPaths.filter((path) => !newPaths.has(path));
+    // 4. Limpa do Storage apenas se a exclusão no banco foi confirmada com sucesso
+    if (dbDeleteSuccess) {
+      const newPaths = new Set(media.map((m) => m.storage_path));
+      const pathsToDelete = oldPaths.filter((path) => !newPaths.has(path));
 
-    if (pathsToDelete.length > 0) {
-      const admin = createAdminClient();
-      const { error: remErr } = await admin.storage.from("whatsapp-media").remove(pathsToDelete);
-      if (remErr) {
-        logger.warn("[message-templates/patch] Falha ao remover arquivos órfãos do Storage", {
-          paths: pathsToDelete,
-          error: remErr.message,
-          requestId,
-        });
+      if (pathsToDelete.length > 0) {
+        const admin = createAdminClient();
+        const { error: remErr } = await admin.storage.from("whatsapp-media").remove(pathsToDelete);
+        if (remErr) {
+          logger.warn("[message-templates/patch] Falha ao remover arquivos órfãos do Storage", {
+            paths: pathsToDelete,
+            error: remErr.message,
+            requestId,
+          });
+        }
       }
     }
   } else {

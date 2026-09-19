@@ -505,7 +505,7 @@ export async function sendMessageHandler(
     }
 
     const tpl = tm.message_templates as unknown as { id: string; organization_id: string; owner_user_id: string | null } | null;
-    if (ctx.actor.type === "user" && tpl?.owner_user_id && tpl.owner_user_id !== ctx.actor.id) {
+    if (tpl?.owner_user_id && (ctx.actor.type !== "user" || ctx.actor.id !== tpl.owner_user_id)) {
       throw new ApiError(
         422,
         "invalid_media_path",

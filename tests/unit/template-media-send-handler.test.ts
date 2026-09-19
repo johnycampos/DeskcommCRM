@@ -262,4 +262,39 @@ describe("sendMessageHandler — Segurança no Envio de Mídia de Template", () 
     const result = await sendMessageHandler(supabase, aiCtx, input);
     expect(result.status).toBe("sent");
   });
+
+  it("BLOQUEIA envio por ator não-humano quando o template é privado (owner_user_id != null)", async () => {
+    const { supabase } = criarDubleDoHandler({
+      conversation: conversationRow(),
+      templateMediaRow: {
+        id: "media-5",
+        template_id: "tpl-private",
+        storage_path: templateStoragePath,
+        organization_id: ORG,
+        message_templates: {
+          id: "tpl-private",
+          organization_id: ORG,
+          owner_user_id: USER,
+        },
+      },
+    });
+
+    const aiCtx: HandlerCtx = {
+      organization_id: ORG,
+      actor: { type: "ai_agent", id: "agent-1", role: "ai" },
+      requestId: "req-agent-1",
+    };
+
+    const input: SendMessageInput = {
+      conversation_id: CONV,
+      type: "image",
+      media_storage_path: templateStoragePath,
+      media_mime: "image/jpeg",
+    };
+
+    await expect(sendMessageHandler(supabase, aiCtx, input)).rejects.toMatchObject({
+      status: 422,
+      code: "invalid_media_path",
+    });
+  });
 });
