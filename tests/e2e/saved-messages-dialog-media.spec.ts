@@ -72,40 +72,49 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
 
     let sessionId = session?.id;
     if (!sessionId) {
-      const { data: newSess } = await admin
+      const { data: newSess, error: sessErr } = await admin
         .from("channel_sessions")
         .insert({
           organization_id: creds.org_id,
           provider: "waha",
           waha_session_name: `e2e_${Date.now()}`,
+          webhook_secret_encrypted: "\\x00",
           status: "WORKING",
         })
         .select("id")
         .single();
+      if (sessErr) throw new Error(`Falha ao criar canal de teste: ${sessErr.message}`);
       sessionId = newSess!.id;
     }
 
-    const { data: contato } = await admin
+    const { data: contato, error: contErr } = await admin
       .from("contacts")
       .insert({
         organization_id: creds.org_id,
         name: NOME_CONTATO,
+        display_name: NOME_CONTATO,
         phone_number: `+553199999${Math.floor(Math.random() * 8999 + 1000)}`,
       })
       .select("id")
       .single();
+    if (contErr) throw new Error(`Falha ao criar contato de teste: ${contErr.message}`);
     contatoId = contato!.id;
 
-    const { data: conv } = await admin
+    const agora = new Date().toISOString();
+    const { data: conv, error: convErr } = await admin
       .from("conversations")
       .insert({
         organization_id: creds.org_id,
         contact_id: contatoId,
         channel_session_id: sessionId,
         status: "open",
+        last_inbound_at: agora,
+        last_message_at: agora,
+        last_message_preview: "Conversa de teste de mensagens salvas",
       })
       .select("id")
       .single();
+    if (convErr) throw new Error(`Falha ao criar conversa de teste: ${convErr.message}`);
     conversaId = conv!.id;
 
     const user = (creds.users.owner ?? creds.users.manager ?? creds.users.admin)!;
@@ -157,7 +166,7 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
     await page.waitForSelector("[data-conversation-id]", { timeout: 30_000 }).catch(() => null);
 
     // Clica no botão "Mensagens salvas" no cabeçalho
-    const savedMsgBtn = page.getByRole("button", { name: /mensagens salvas/i });
+    const savedMsgBtn = page.getByTestId("botao-mensagens-salvas");
     await expect(savedMsgBtn).toBeVisible({ timeout: 15_000 });
     await savedMsgBtn.click();
 
@@ -181,7 +190,9 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
     await login(page, user.email, creds.password);
 
     await page.goto(`/app/inbox/${conversaId}`);
-    await page.getByRole("button", { name: /mensagens salvas/i }).click();
+    const savedMsgBtn = page.getByTestId("botao-mensagens-salvas");
+    await expect(savedMsgBtn).toBeVisible({ timeout: 15_000 });
+    await savedMsgBtn.click();
 
     const searchInput = page.getByPlaceholder(/buscar por título, atalho ou texto/i);
     await searchInput.fill(TEMPLATE_TITLE);
