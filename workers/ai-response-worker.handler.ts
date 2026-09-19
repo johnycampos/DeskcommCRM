@@ -24,7 +24,10 @@ export const aiResponseHandler: EventHandler = {
       return {
         consumer_key: AI_RESPONSE_HANDLER_KEY,
         status: "skipped",
-        detail: result.reason,
+        detail:
+          result.reason === "agent_inactive_or_missing"
+            ? "agent_inactive_or_missing (esperado - tratado pelo agent-engine, ver #129)"
+            : result.reason,
       };
     }
     return { consumer_key: AI_RESPONSE_HANDLER_KEY, status: "error", detail: result.detail };

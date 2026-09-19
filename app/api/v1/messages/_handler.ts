@@ -335,15 +335,23 @@ function previewFrom(input: {
  * e nenhum envio manual tocava nenhum dos dois.
  */
 const HUMAN_REPLY_SILENCE_MS = 5 * 60 * 1000;
+const HUMAN_CLAIM_SILENCE_MS = 2 * 60 * 60 * 1000; // 2 horas de TTL sob controle humano
 
 /**
  * Postgres 'infinity' (handoff permanente — regex/tool/orquestrador) chega do PostgREST
  * como o literal texto "infinity", que `new Date(...)` não parseia. Nunca encurtar isso
  * para uma janela de 5min: se já está travado pra sempre, este helper não mexe.
+ * Quando a conversa está sob controle humano (atribuída a atendente), estende o silêncio
+ * por 2 horas a cada envio humano, alinhado ao TTL de fn_conversation_assign.
  */
-function extendBotSilence(current: string | null, now: string): string | undefined {
+function extendBotSilence(
+  current: string | null,
+  now: string,
+  isClaimedByUser: boolean = false,
+): string | undefined {
   if (current === "infinity") return undefined;
-  const candidate = new Date(new Date(now).getTime() + HUMAN_REPLY_SILENCE_MS);
+  const silenceMs = isClaimedByUser ? HUMAN_CLAIM_SILENCE_MS : HUMAN_REPLY_SILENCE_MS;
+  const candidate = new Date(new Date(now).getTime() + silenceMs);
   if (current && new Date(current) >= candidate) return undefined;
   return candidate.toISOString();
 }
@@ -373,7 +381,7 @@ export async function sendMessageHandler(
   // envio com 42703. Sem a coluna, nada está arquivado — e a consulta sem ela é a
   // consulta certa (ver lib/channels/archived).
   const convSelect = (comArchived: boolean) =>
-    `id, organization_id, contact_id, channel_session_id, is_group, group_chat_id, bot_silenced_until, provider_conversation_id, last_inbound_at, contacts:contact_id(phone_number, wa_identity, wa_lid, is_blocked), channel_sessions:channel_session_id(${CHANNEL_SESSION_REF_COLUMNS}, status${comArchived ? `, ${ARCHIVED_AT}` : ""})`;
+    `id, organization_id, contact_id, channel_session_id, is_group, group_chat_id, bot_silenced_until, assigned_to_user_id, assignee_kind, provider_conversation_id, last_inbound_at, contacts:contact_id(phone_number, wa_identity, wa_lid, is_blocked), channel_sessions:channel_session_id(${CHANNEL_SESSION_REF_COLUMNS}, status${comArchived ? `, ${ARCHIVED_AT}` : ""})`;
   //
   // O filtro por `organization_id` NÃO é redundância com a RLS — é a única
   // proteção que existe na metade dos chamadores. Este handler é a porta de
@@ -428,6 +436,8 @@ export async function sendMessageHandler(
     is_group: boolean;
     group_chat_id: string | null;
     bot_silenced_until: string | null;
+    assigned_to_user_id: string | null;
+    assignee_kind: string | null;
     /** Thread do provider, quando ele endereça por thread própria (migration 0132). */
     provider_conversation_id: string | null;
     /**
@@ -1004,7 +1014,8 @@ export async function sendMessageHandler(
     awaiting_since: c.last_inbound_at,
   };
   if (ctx.actor.type === "user") {
-    const silenceUntil = extendBotSilence(c.bot_silenced_until, now);
+    const isClaimedByUser = c.assignee_kind === "user" || Boolean(c.assigned_to_user_id);
+    const silenceUntil = extendBotSilence(c.bot_silenced_until, now, isClaimedByUser);
     if (silenceUntil) conversationUpdate.bot_silenced_until = silenceUntil;
   }
 

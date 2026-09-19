@@ -44,8 +44,8 @@ import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
 
-/** O mesmo literal do handoff: `bot_silenced_until > now()` é sempre verdadeiro. */
-const SILENCIO_DURAVEL = "infinity";
+/** TTL de 2 horas no handoff manual: alinhado à migration 0234. */
+const TTL_PAUSA_MS = 2 * 60 * 60 * 1000;
 const MOTIVO = "Automático pausado pelo atendente";
 
 interface RouteCtx {
@@ -121,13 +121,12 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   // quem já a tem — pausar o automático e trocar o dono são gestos diferentes, e
   // um gerente pausando a conversa de um colega não pode virar takeover mudo.
   //
-  // Roda também no caminho do claim: a RPC já grava `'infinity'`, e reafirmar é
-  // barato e imune a um clone cuja função ainda seja a versão anterior — o
-  // `update.sh` aplica o baseline, mas nada garante que este código não chegou
-  // primeiro.
+  // Roda também no caminho do claim: a RPC já grava `now() + 2 hours`, e reafirmar é
+  // barato e imune a um clone cuja função ainda seja a versão anterior.
+  const silencioAte = new Date(Date.now() + TTL_PAUSA_MS).toISOString();
   const { data: atualizada, error: updErr } = await supabase
     .from("conversations")
-    .update({ bot_silenced_until: SILENCIO_DURAVEL, last_handoff_reason: MOTIVO })
+    .update({ bot_silenced_until: silencioAte, last_handoff_reason: MOTIVO })
     .eq("id", id)
     .eq("organization_id", org.orgId)
     .select("id, contact_id, organization_id, status, assigned_to_user_id, bot_silenced_until")

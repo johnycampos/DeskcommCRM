@@ -586,6 +586,16 @@ Processo padrão (siga sempre):
 
 ---
 
+## Grafo de conhecimento (graphify) — use antes/depois de alterações
+
+O repo tem um knowledge graph gerado pela skill `graphify` em `graphify-out/` (escopo atual: `lib`, `app`, `components`, `hooks` — 1.856 arquivos, 10.847 nós, 37.621 arestas, 271 comunidades; `tests`, `evidence`, `docs` e `supabase` ficaram de fora do grafo, não do repo). `graphify-out/graph.json` é o dado real; `GRAPH_REPORT.md` é uma fotografia legível por humano (God Nodes, comunidades, conexões suspeitas) — não é a ferramenta de trabalho do dia a dia, é para visão geral ocasional.
+
+**Antes de alterar algo:** rode `graphify query "<pergunta>"` ou `graphify path "<A>" "<B>"` para mapear quem depende do que, em vez de grepar o repo inteiro. Ex.: antes de mexer em `bot_silenced_until`/`fn_conversation_assign`, `graphify query "o que chama fn_conversation_assign"` mostra o blast radius real (rotas, workers, testes).
+
+**Depois de alterar algo:** rode `graphify update .` (não o build completo) — reextrai só os arquivos mudados e mantém `graph.json` fiel ao código atual. Rodar o pipeline completo (`/graphify .`) de novo do zero só é necessário se o escopo de diretórios mudar.
+
+Se `graphify-out/graph.json` não existir mais (deletado, clone novo), reconstrua com `/graphify lib app components hooks` antes de confiar em qualquer resposta do grafo.
+
 ## Skills relevantes a usar (Claude Code)
 
 **Guias embutidos neste repositório** (`.claude/skills/`, espelho gerado de `.agents/skills/` — a

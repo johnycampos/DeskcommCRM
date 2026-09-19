@@ -30,7 +30,15 @@ export function createPool(
   const raw = process.env.DB_POOL_MAX;
   const parsed = raw === undefined ? Number.NaN : Number.parseInt(raw, 10);
   const max = Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
-  const pool = new pg.Pool({ connectionString: databaseUrl, max });
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    max,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    statement_timeout: 30000,
+  });
   const handler =
     onError ??
     ((err: Error): void => {

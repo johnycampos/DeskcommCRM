@@ -15970,29 +15970,29 @@ create policy calendar_oauth_nonces_ninguem_le
   for select
   using (false);
 
--- A quarta poda do `data-retention`. Assinatura idêntica às três irmãs
--- (`p_dias`, `p_lote`) para o mesmo laço de lotes servir sem caso especial.
-create or replace function public.fn_expurgar_nonces_de_oauth(p_dias int, p_lote int default 500)
+-- A quarta poda do `data-retention`. Assinatura CORRIGIDA pela migration 0233:
+-- nasceu com `p_dias, p_lote` e essa frase dizia "idêntica às três irmãs" —
+-- era falso. `drenar` (app/api/v1/cron/data-retention/route.ts) chama as
+-- QUATRO pelos MESMOS nomes de argumento (`p_retencao_dias`, `p_limite`), e
+-- PostgREST casa função por nome + nomes de argumento numa chamada nomeada:
+-- sem overload compatível, "Could not find the function ... in the schema
+-- cache" — medido em produção, a quarta poda falhava toda rodada.
+create or replace function public.fn_expurgar_nonces_de_oauth(p_retencao_dias int default null, p_limite int default 500)
 returns int
 language plpgsql
 security definer
 set search_path to 'public', 'pg_temp'
 as $$
 declare
+  v_dias int := greatest(coalesce(p_retencao_dias, 1), 1);
+  v_limite int := greatest(coalesce(p_limite, 500), 1);
   v_removidas int;
 begin
-  -- Piso no CORPO, como as irmãs: um chamador que passe 0 não apaga nonce que
-  -- ainda protege. O prazo do state é de 10 minutos, então um dia já é folga
-  -- de duas ordens de grandeza.
-  if p_dias is null or p_dias < 1 then
-    p_dias := 1;
-  end if;
-
   with alvo as (
     select nonce
       from public.calendar_oauth_nonces
-     where expira_em < now() - make_interval(days => p_dias)
-     limit greatest(p_lote, 1)
+     where expira_em < now() - make_interval(days => v_dias)
+     limit v_limite
   )
   delete from public.calendar_oauth_nonces n
    using alvo
