@@ -2822,3 +2822,25 @@ que dirige o browser resolviam `E2E_PORT` para valores **diferentes** — servid
 `page.goto` em outra, e `ERR_CONNECTION_REFUSED` com um servidor saudável no ar. O CI nunca
 pisou nisso porque o gerador não escreve `E2E_PORT`; quem monta bancada em porta própria,
 sim. Consertado pela ordem: publicar primeiro, decidir a porta depois.
+
+---
+
+### J31 — Mensagens Salvas e Scripts com Mídia no Cabeçalho da Conversa `[P0]`
+
+Contexto do código: funcionalidade de respostas rápidas com suporte a mídia (imagens e vídeos)
+e envio direto sem passar pelo compositor. Tabela `message_template_media` com RLS por tenant/owner,
+rota de upload `/api/v1/message-templates/media`, dialog de seleção direta no cabeçalho
+(`components/inbox/SavedMessagesDialog.tsx`) e validação de segurança no `sendMessageHandler`
+impedindo que um atendente envie mídia de template privado de outro colega.
+
+Spec: `tests/e2e/saved-messages-dialog-media.spec.ts`.
+Evidência: `.superpowers/evidence/saved-messages-media/`.
+
+| caso | o que se mede | estado |
+|---|---|---|
+| J31.1 | Botão "Mensagens salvas" acessível no cabeçalho da conversa (`ConversationHeader.tsx`) respeitando travas de canal/sessão | PASS |
+| J31.2 | Modal com busca por título, atalho e corpo, badge de contagem de anexos e preview com tamanho formatado | PASS |
+| J31.3 | Envio direto interpola variáveis do contato (`{{nome}}`) e despacha mídia + legenda em sequência ordenada | PASS |
+| J31.4 | Segurança e RLS: atendente só lista e despacha mídias de templates compartilhados ou próprios | PASS |
+| J31.5 | Gestão de templates (`/app/templates`): upload, edição atômica e exclusão em cascade com limpeza no Storage | PASS |
+

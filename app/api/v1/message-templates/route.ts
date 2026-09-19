@@ -131,6 +131,12 @@ export async function POST(req: NextRequest): Promise<Response> {
         .insert(mediaRows)
         .select("id, storage_path, media_mime, media_size_bytes, filename, position");
       if (mediaErr || !mediaResult) {
+        // Compensação: remove o template criado para não deixar registro órfão
+        await supabase
+          .from("message_templates")
+          .delete()
+          .eq("id", data.id)
+          .eq("organization_id", org.orgId);
         throw new Error("Erro ao salvar mídias do template.");
       }
       insertedMedia = mediaResult;

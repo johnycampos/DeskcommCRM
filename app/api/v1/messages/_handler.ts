@@ -479,6 +479,43 @@ export async function sendMessageHandler(
     );
   }
 
+  if (
+    input.media_storage_path &&
+    input.media_storage_path.startsWith(`${c.organization_id}/templates/`)
+  ) {
+    const { data: tm, error: tmErr } = await supabase
+      .from("message_template_media")
+      .select("id, template_id, message_templates!inner(id, organization_id, owner_user_id)")
+      .eq("storage_path", input.media_storage_path)
+      .eq("organization_id", c.organization_id)
+      .maybeSingle();
+
+    if (tmErr) {
+      throw new ApiError(500, "internal_error", undefined, ctx.requestId, tmErr.message);
+    }
+
+    if (!tm) {
+      throw new ApiError(
+        422,
+        "invalid_media_path",
+        undefined,
+        ctx.requestId,
+        "media_storage_path de template não encontrado ou não acessível.",
+      );
+    }
+
+    const tpl = tm.message_templates as unknown as { id: string; organization_id: string; owner_user_id: string | null } | null;
+    if (ctx.actor.type === "user" && tpl?.owner_user_id && tpl.owner_user_id !== ctx.actor.id) {
+      throw new ApiError(
+        422,
+        "invalid_media_path",
+        undefined,
+        ctx.requestId,
+        "media_storage_path de template privado de outro usuário.",
+      );
+    }
+  }
+
   let outboundBody = input.body ?? null;
   let outboundMetadata: Record<string, unknown> = { ...(input.metadata ?? {}) };
 

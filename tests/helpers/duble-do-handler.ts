@@ -14,6 +14,7 @@ export interface OpcoesDoDubleDoHandler {
   conversation: LinhaDoDuble;
   channelMetadata?: LinhaDoDuble;
   templateRow?: LinhaDoDuble | null;
+  templateMediaRow?: LinhaDoDuble | null | ((storagePath: string) => LinhaDoDuble | null);
   rpcData?: unknown | (() => unknown);
 }
 
@@ -58,9 +59,16 @@ export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): {
       contacts: [],
       meta_templates: [],
       channel_sessions: [],
+      message_template_media: [],
     },
     inserts: { messages: [] },
-    selects: { conversations: [], messages: [], meta_templates: [], channel_sessions: [] },
+    selects: {
+      conversations: [],
+      messages: [],
+      meta_templates: [],
+      channel_sessions: [],
+      message_template_media: [],
+    },
   };
 
   let mensagem: LinhaDoDuble | null = null;
@@ -118,6 +126,31 @@ export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): {
         };
       }
 
+      if (tabela === "message_template_media") {
+        let currentStoragePath: string | null = null;
+        const cadeia = {
+          eq: (coluna: string, valor: unknown) => {
+            capturas.filtros.message_template_media!.push({ coluna, valor });
+            if (coluna === "storage_path" && typeof valor === "string") {
+              currentStoragePath = valor;
+            }
+            return cadeia;
+          },
+          maybeSingle: async () => {
+            if (typeof opcoes.templateMediaRow === "function" && currentStoragePath) {
+              return { data: opcoes.templateMediaRow(currentStoragePath), error: null };
+            }
+            return { data: opcoes.templateMediaRow ?? null, error: null };
+          },
+        };
+        return {
+          select: (colunas = "") => {
+            capturas.selects.message_template_media!.push(colunas);
+            return cadeia;
+          },
+        };
+      }
+
       if (tabela === "contacts") {
         return {
           update: (patch: LinhaDoDuble) => {
@@ -128,6 +161,13 @@ export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): {
       }
 
       if (tabela === "messages") {
+        const deleteCadeia: Record<string, unknown> = {
+          eq: () => deleteCadeia,
+          in: () => deleteCadeia,
+          neq: () => deleteCadeia,
+          then: (resolve: (v: { error: null }) => unknown) =>
+            Promise.resolve({ error: null }).then(resolve),
+        };
         return {
           insert: (row: LinhaDoDuble) => {
             capturas.inserts.messages!.push(row);
@@ -163,6 +203,7 @@ export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): {
             };
             return cadeia;
           },
+          delete: () => deleteCadeia,
         };
       }
 

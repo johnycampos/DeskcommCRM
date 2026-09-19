@@ -13,6 +13,7 @@ import { updateTemplateSchema } from "@/lib/schemas/templates";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -70,33 +71,17 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
   let finalMedia: Array<{ id: string; storage_path: string; media_mime: string; media_size_bytes: number; filename: string | null; position: number }> = [];
 
   if (media !== undefined) {
-    // 1. Busca mídias antigas para limpar do Storage os arquivos removidos
+    // 1. Busca mídias antigas para registrar IDs e paths antes de alterar
     const { data: oldMedia } = await supabase
       .from("message_template_media")
-      .select("storage_path")
+      .select("id, storage_path")
       .eq("template_id", id)
       .eq("organization_id", org.orgId);
 
-    const newPaths = new Set(media.map((m) => m.storage_path));
-    const pathsToDelete = (oldMedia ?? [])
-      .map((m) => m.storage_path)
-      .filter((path) => !newPaths.has(path));
+    const oldMediaIds = (oldMedia ?? []).map((m) => m.id);
+    const oldPaths = (oldMedia ?? []).map((m) => m.storage_path);
 
-    if (pathsToDelete.length > 0) {
-      const admin = createAdminClient();
-      await admin.storage.from("whatsapp-media").remove(pathsToDelete).catch(() => null);
-    }
-
-    // 2. Substitui mídias do template
-    const { error: delErr } = await supabase
-      .from("message_template_media")
-      .delete()
-      .eq("template_id", id)
-      .eq("organization_id", org.orgId);
-    if (delErr) {
-      return fail("internal_error", t("Erro ao atualizar mídias do template."), 500, { requestId });
-    }
-
+    // 2. Insere mídias novas PRIMEIRO — se falhar, preserva mídias antigas sem perda de dados
     if (media.length > 0) {
       const mediaRows = media.map((m, idx) => ({
         template_id: id,
@@ -115,6 +100,38 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
         return fail("internal_error", t("Erro ao salvar mídias do template."), 500, { requestId });
       }
       finalMedia = mediaInserted;
+    }
+
+    // 3. Com a inserção confirmada, deleta mídias antigas do banco
+    if (oldMediaIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from("message_template_media")
+        .delete()
+        .in("id", oldMediaIds)
+        .eq("organization_id", org.orgId);
+      if (delErr) {
+        logger.warn("[message-templates/patch] Falha ao excluir referências antigas de mídia no banco", {
+          templateId: id,
+          error: delErr.message,
+          requestId,
+        });
+      }
+    }
+
+    // 4. Limpa do Storage apenas os arquivos físicos que não estão mais presentes
+    const newPaths = new Set(media.map((m) => m.storage_path));
+    const pathsToDelete = oldPaths.filter((path) => !newPaths.has(path));
+
+    if (pathsToDelete.length > 0) {
+      const admin = createAdminClient();
+      const { error: remErr } = await admin.storage.from("whatsapp-media").remove(pathsToDelete);
+      if (remErr) {
+        logger.warn("[message-templates/patch] Falha ao remover arquivos órfãos do Storage", {
+          paths: pathsToDelete,
+          error: remErr.message,
+          requestId,
+        });
+      }
     }
   } else {
     // Mantém as existentes
@@ -153,7 +170,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
 
   const supabase = await createClient();
 
-  // Busca mídias associadas para remover do Storage
+  // Busca mídias associadas para remover do Storage após confirmação
   const { data: existingMedia } = await supabase
     .from("message_template_media")
     .select("storage_path")
@@ -173,7 +190,14 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
   if (existingMedia && existingMedia.length > 0) {
     const paths = existingMedia.map((m) => m.storage_path);
     const admin = createAdminClient();
-    await admin.storage.from("whatsapp-media").remove(paths).catch(() => null);
+    const { error: remErr } = await admin.storage.from("whatsapp-media").remove(paths);
+    if (remErr) {
+      logger.warn("[message-templates/delete] Falha ao remover arquivos do Storage após exclusão de template", {
+        paths,
+        error: remErr.message,
+        requestId,
+      });
+    }
   }
 
   void audit({
