@@ -19,9 +19,8 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * mandar a conversa para `pending` apagaria o dono da tela no exato gesto em que
  * a pessoa disse que ia cuidar.
  *
- * Então: silêncio durável (`bot_silenced_until='infinity'`, o mesmo literal que o
- * handoff usa e que os três guards do motor leem) e, **se ninguém for dono, um
- * claim para quem clicou**. Pausar sem dono deixaria a conversa sem ator nenhum —
+ * Então: silêncio temporário (`bot_silenced_until = now() + 2 hours`, alinhado à migration 0344)
+ * e, **se ninguém for dono, um claim para quem clicou**. Pausar sem dono deixaria a conversa sem ator nenhum —
  * automático desligado e nenhuma pessoa responsável —, que é morte por definição
  * (invariante 4 do Sistema Vivo: nenhuma demanda sem próximo passo).
  *
@@ -44,7 +43,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
 
-/** TTL de 2 horas no handoff manual: alinhado à migration 0234. */
+/** TTL de 2 horas no handoff manual: alinhado à migration 0344. */
 const TTL_PAUSA_MS = 2 * 60 * 60 * 1000;
 const MOTIVO = "Automático pausado pelo atendente";
 

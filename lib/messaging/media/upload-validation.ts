@@ -5,16 +5,16 @@ export type MessageKind = "image" | "video" | "audio" | "document";
 
 /**
  * Posse do objeto no bucket: o path DEVE estar sob {org}/{conversation}/
- * (chaves do Storage são literais — sem semântica de traversal).
+ * (mídia de upload da conversa) OU sob {org}/templates/ (mídia de template
+ * reutilizável entre as conversas da mesma organização).
  *
- * Morava dentro do módulo de transporte do provider legado e não tinha nada a
- * ver com o canal: valida um path do NOSSO Storage, antes de qualquer coisa
- * tocar um provider. Ficar lá obrigava o handler de envio a importar do módulo
- * do provider — o acoplamento que o invariante 1 de
- * `docs/doctrine/restricao-de-canal.md` proíbe.
+ * Chaves do Storage são literais — sem semântica de traversal.
  */
 export function isMediaPathOwnedBy(path: string, orgId: string, conversationId: string): boolean {
-  return path.startsWith(`${orgId}/${conversationId}/`);
+  return (
+    path.startsWith(`${orgId}/${conversationId}/`) ||
+    path.startsWith(`${orgId}/templates/`)
+  );
 }
 
 const DOCUMENT_MIMES = new Set([

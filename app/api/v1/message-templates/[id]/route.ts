@@ -1,7 +1,7 @@
 import { requireSupportWrite } from "@/lib/impersonate/support";
 /**
  * PATCH  /api/v1/message-templates/[id] — atualiza título/corpo/atalho e mídias.
- * DELETE /api/v1/message-templates/[id] — remove o template (e mídias em cascade).
+ * DELETE /api/v1/message-templates/[id] — remove o template (e mídias em cascade/Storage).
  */
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
@@ -11,6 +11,7 @@ import { fail, ok, noContent } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { updateTemplateSchema } from "@/lib/schemas/templates";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -69,12 +70,32 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
   let finalMedia: Array<{ id: string; storage_path: string; media_mime: string; media_size_bytes: number; filename: string | null; position: number }> = [];
 
   if (media !== undefined) {
-    // Substitui mídias do template
-    await supabase
+    // 1. Busca mídias antigas para limpar do Storage os arquivos removidos
+    const { data: oldMedia } = await supabase
+      .from("message_template_media")
+      .select("storage_path")
+      .eq("template_id", id)
+      .eq("organization_id", org.orgId);
+
+    const newPaths = new Set(media.map((m) => m.storage_path));
+    const pathsToDelete = (oldMedia ?? [])
+      .map((m) => m.storage_path)
+      .filter((path) => !newPaths.has(path));
+
+    if (pathsToDelete.length > 0) {
+      const admin = createAdminClient();
+      await admin.storage.from("whatsapp-media").remove(pathsToDelete).catch(() => null);
+    }
+
+    // 2. Substitui mídias do template
+    const { error: delErr } = await supabase
       .from("message_template_media")
       .delete()
       .eq("template_id", id)
       .eq("organization_id", org.orgId);
+    if (delErr) {
+      return fail("internal_error", t("Erro ao atualizar mídias do template."), 500, { requestId });
+    }
 
     if (media.length > 0) {
       const mediaRows = media.map((m, idx) => ({
@@ -86,13 +107,14 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
         filename: m.filename ?? null,
         position: m.position ?? idx,
       }));
-      const { data: mediaInserted } = await supabase
+      const { data: mediaInserted, error: insertErr } = await supabase
         .from("message_template_media")
         .insert(mediaRows)
         .select("id, storage_path, media_mime, media_size_bytes, filename, position");
-      if (mediaInserted) {
-        finalMedia = mediaInserted;
+      if (insertErr || !mediaInserted) {
+        return fail("internal_error", t("Erro ao salvar mídias do template."), 500, { requestId });
       }
+      finalMedia = mediaInserted;
     }
   } else {
     // Mantém as existentes
@@ -130,6 +152,14 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
   const { id } = await params;
 
   const supabase = await createClient();
+
+  // Busca mídias associadas para remover do Storage
+  const { data: existingMedia } = await supabase
+    .from("message_template_media")
+    .select("storage_path")
+    .eq("template_id", id)
+    .eq("organization_id", org.orgId);
+
   const { data: deleted, error } = await supabase
     .from("message_templates")
     .delete()
@@ -139,6 +169,12 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
     .maybeSingle();
   if (error) return fail("internal_error", "Erro ao excluir template.", 500, { requestId });
   if (!deleted) return fail("not_found", t("Template não encontrado."), 404, { requestId });
+
+  if (existingMedia && existingMedia.length > 0) {
+    const paths = existingMedia.map((m) => m.storage_path);
+    const admin = createAdminClient();
+    await admin.storage.from("whatsapp-media").remove(paths).catch(() => null);
+  }
 
   void audit({
     action: "template.deleted",

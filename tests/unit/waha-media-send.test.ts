@@ -43,7 +43,14 @@ describe("isMediaPathOwnedBy", () => {
   it("conversa diferente → false", () => {
     expect(isMediaPathOwnedBy(`${orgId}/conv-2/foo.jpg`, orgId, conversationId)).toBe(false);
   });
+  it("path de template da própria org → true", () => {
+    expect(isMediaPathOwnedBy(`${orgId}/templates/foo.jpg`, orgId, conversationId)).toBe(true);
+  });
+  it("path de template de outra org → false", () => {
+    expect(isMediaPathOwnedBy(`org-2/templates/foo.jpg`, orgId, conversationId)).toBe(false);
+  });
   it("confusão de prefixo (org-1x/...) → false", () => {
     expect(isMediaPathOwnedBy(`${orgId}x/${conversationId}/foo.jpg`, orgId, conversationId)).toBe(false);
+    expect(isMediaPathOwnedBy(`${orgId}x/templates/foo.jpg`, orgId, conversationId)).toBe(false);
   });
 });

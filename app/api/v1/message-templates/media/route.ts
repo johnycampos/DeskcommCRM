@@ -52,7 +52,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   // Templates aceitam imagens e vídeos (Top Coworking)
-  if (verdict.kind !== "image" && verdict.kind !== "video" && verdict.kind !== "document") {
+  if (verdict.kind !== "image" && verdict.kind !== "video") {
     return fail("unsupported_media_type", t("Mídia não suportada para template (apenas imagem ou vídeo)."), 415, { requestId });
   }
 

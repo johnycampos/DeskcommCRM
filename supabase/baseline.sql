@@ -32136,8 +32136,6 @@ grant execute on function public.fn_encrypt_oauth(text) to service_role;
 grant execute on function public.fn_lgpd_cascade_redact_contact(uuid, uuid, uuid) to service_role;
 grant execute on function public.fn_update_budget_consumption() to service_role;
 
-<<<<<<< HEAD
-
 -- ---- Criador provisório sai na entrega (migration 0237) ----
 -- As duas funções acima já saíram com a regra; aqui fica só a COLUNA, que é
 -- o dado que faltava. Idempotente. NÃO há expurgo retroativo, de propósito:

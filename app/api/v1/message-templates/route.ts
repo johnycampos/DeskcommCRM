@@ -130,9 +130,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         .from("message_template_media")
         .insert(mediaRows)
         .select("id, storage_path, media_mime, media_size_bytes, filename, position");
-      if (!mediaErr && mediaResult) {
-        insertedMedia = mediaResult;
+      if (mediaErr || !mediaResult) {
+        throw new Error("Erro ao salvar mídias do template.");
       }
+      insertedMedia = mediaResult;
     }
 
     void audit({

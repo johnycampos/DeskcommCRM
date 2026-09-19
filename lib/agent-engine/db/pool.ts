@@ -37,7 +37,6 @@ export function createPool(
     keepAliveInitialDelayMillis: 10000,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
-    statement_timeout: 30000,
   });
   const handler =
     onError ??

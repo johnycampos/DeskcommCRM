@@ -43,6 +43,35 @@ describe("createTemplateSchema", () => {
     }
   });
 
+  it("rejeita anexo que não seja imagem ou vídeo", () => {
+    const r = createTemplateSchema.safeParse({
+      title: "Doc",
+      body: "Segue pdf",
+      media: [
+        {
+          storage_path: "org_123/templates/doc.pdf",
+          media_mime: "application/pdf",
+          media_size_bytes: 1024,
+        },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejeita mais de 10 mídias por template", () => {
+    const mediaList = Array.from({ length: 11 }, (_, i) => ({
+      storage_path: `org_123/templates/img_${i}.png`,
+      media_mime: "image/png",
+      media_size_bytes: 1024,
+    }));
+    const r = createTemplateSchema.safeParse({
+      title: "Muitas mídias",
+      body: "11 imagens",
+      media: mediaList,
+    });
+    expect(r.success).toBe(false);
+  });
+
   it("rejeita title vazio e body vazio", () => {
     expect(createTemplateSchema.safeParse({ title: "", body: "x" }).success).toBe(false);
     expect(createTemplateSchema.safeParse({ title: "x", body: "" }).success).toBe(false);
