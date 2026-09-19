@@ -57,7 +57,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const ext = extFromMime(mime);
-  const storagePath = `${org.orgId}/templates/${randomUUID()}.${ext}`;
+  const storagePath = `${org.orgId}/message-template-media/${randomUUID()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   const admin = createAdminClient();
 

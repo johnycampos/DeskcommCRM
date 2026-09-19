@@ -21,14 +21,14 @@ describe("createTemplateSchema", () => {
       shortcut: "reserva",
       media: [
         {
-          storage_path: "org_123/templates/mapa.png",
+          storage_path: "11111111-1111-4111-8111-111111111111/message-template-media/22222222-2222-4222-8222-222222222222.png",
           media_mime: "image/png",
           media_size_bytes: 102400,
           filename: "mapa.png",
           position: 0,
         },
         {
-          storage_path: "org_123/templates/video.mp4",
+          storage_path: "11111111-1111-4111-8111-111111111111/message-template-media/33333333-3333-4333-8333-333333333333.mp4",
           media_mime: "video/mp4",
           media_size_bytes: 5242880,
           filename: "video.mp4",
@@ -49,8 +49,23 @@ describe("createTemplateSchema", () => {
       body: "Segue pdf",
       media: [
         {
-          storage_path: "org_123/templates/doc.pdf",
+          storage_path: "11111111-1111-4111-8111-111111111111/message-template-media/22222222-2222-4222-8222-222222222222.pdf",
           media_mime: "application/pdf",
+          media_size_bytes: 1024,
+        },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejeita storage_path com formato ou namespace inválido", () => {
+    const r = createTemplateSchema.safeParse({
+      title: "Path inválido",
+      body: "Foto de conversa de outro cliente",
+      media: [
+        {
+          storage_path: "11111111-1111-4111-8111-111111111111/conversa-123/foto.png",
+          media_mime: "image/png",
           media_size_bytes: 1024,
         },
       ],
@@ -60,7 +75,7 @@ describe("createTemplateSchema", () => {
 
   it("rejeita mais de 10 mídias por template", () => {
     const mediaList = Array.from({ length: 11 }, (_, i) => ({
-      storage_path: `org_123/templates/img_${i}.png`,
+      storage_path: `11111111-1111-4111-8111-111111111111/message-template-media/00000000-0000-4000-8000-00000000000${i.toString(16)}.png`,
       media_mime: "image/png",
       media_size_bytes: 1024,
     }));
@@ -87,7 +102,7 @@ describe("updateTemplateSchema", () => {
     const r = updateTemplateSchema.safeParse({
       media: [
         {
-          storage_path: "org_123/templates/novo_mapa.png",
+          storage_path: "11111111-1111-4111-8111-111111111111/message-template-media/44444444-4444-4444-8444-444444444444.png",
           media_mime: "image/png",
           media_size_bytes: 204800,
         },

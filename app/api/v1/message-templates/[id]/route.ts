@@ -71,69 +71,98 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
   let finalMedia: Array<{ id: string; storage_path: string; media_mime: string; media_size_bytes: number; filename: string | null; position: number }> = [];
 
   if (media !== undefined) {
-    // 1. Busca mídias antigas para registrar IDs e paths antes de alterar
+    if (media.length > 0) {
+      for (const m of media) {
+        if (!m.storage_path.startsWith(`${org.orgId}/message-template-media/`)) {
+          return fail("validation_failed", t("storage_path de mídia inválido ou fora da organização."), 422, { requestId });
+        }
+      }
+    }
+
+    // 1. Busca mídias existentes ordenadas por posição
     const { data: oldMedia } = await supabase
       .from("message_template_media")
-      .select("id, storage_path")
+      .select("id, storage_path, media_mime, media_size_bytes, filename, position")
       .eq("template_id", id)
-      .eq("organization_id", org.orgId);
+      .eq("organization_id", org.orgId)
+      .order("position", { ascending: true });
 
-    const oldMediaIds = (oldMedia ?? []).map((m) => m.id);
-    const oldPaths = (oldMedia ?? []).map((m) => m.storage_path);
+    // Se o array de mídias não mudou em nada, não toca no banco nem no storage (evita churn de UUIDs)
+    const isUnchanged =
+      oldMedia &&
+      oldMedia.length === media.length &&
+      media.every((m, idx) => {
+        const old = oldMedia[idx];
+        return (
+          old &&
+          old.storage_path === m.storage_path &&
+          old.media_mime === m.media_mime &&
+          old.media_size_bytes === m.media_size_bytes &&
+          (old.filename ?? null) === (m.filename ?? null) &&
+          (old.position ?? idx) === (m.position ?? idx)
+        );
+      });
 
-    // 2. Insere mídias novas PRIMEIRO — se falhar, preserva mídias antigas sem perda de dados
-    if (media.length > 0) {
-      const mediaRows = media.map((m, idx) => ({
-        template_id: id,
-        organization_id: org.orgId,
-        storage_path: m.storage_path,
-        media_mime: m.media_mime,
-        media_size_bytes: m.media_size_bytes,
-        filename: m.filename ?? null,
-        position: m.position ?? idx,
-      }));
-      const { data: mediaInserted, error: insertErr } = await supabase
-        .from("message_template_media")
-        .insert(mediaRows)
-        .select("id, storage_path, media_mime, media_size_bytes, filename, position");
-      if (insertErr || !mediaInserted) {
-        return fail("internal_error", t("Erro ao salvar mídias do template."), 500, { requestId });
+    if (isUnchanged) {
+      finalMedia = oldMedia;
+    } else {
+      const oldMediaIds = (oldMedia ?? []).map((m) => m.id);
+      const oldPaths = (oldMedia ?? []).map((m) => m.storage_path);
+
+      // 2. Insere mídias novas PRIMEIRO — se falhar, preserva mídias antigas sem perda de dados
+      if (media.length > 0) {
+        const mediaRows = media.map((m, idx) => ({
+          template_id: id,
+          organization_id: org.orgId,
+          storage_path: m.storage_path,
+          media_mime: m.media_mime,
+          media_size_bytes: m.media_size_bytes,
+          filename: m.filename ?? null,
+          position: m.position ?? idx,
+        }));
+        const { data: mediaInserted, error: insertErr } = await supabase
+          .from("message_template_media")
+          .insert(mediaRows)
+          .select("id, storage_path, media_mime, media_size_bytes, filename, position");
+        if (insertErr || !mediaInserted) {
+          return fail("internal_error", t("Erro ao salvar mídias do template."), 500, { requestId });
+        }
+        finalMedia = mediaInserted;
       }
-      finalMedia = mediaInserted;
-    }
 
-    // 3. Com a inserção confirmada, deleta mídias antigas do banco
-    let dbDeleteSuccess = true;
-    if (oldMediaIds.length > 0) {
-      const { error: delErr } = await supabase
-        .from("message_template_media")
-        .delete()
-        .in("id", oldMediaIds)
-        .eq("organization_id", org.orgId);
-      if (delErr) {
-        dbDeleteSuccess = false;
-        logger.warn("[message-templates/patch] Falha ao excluir referências antigas de mídia no banco", {
-          templateId: id,
-          error: delErr.message,
-          requestId,
-        });
-      }
-    }
-
-    // 4. Limpa do Storage apenas se a exclusão no banco foi confirmada com sucesso
-    if (dbDeleteSuccess) {
-      const newPaths = new Set(media.map((m) => m.storage_path));
-      const pathsToDelete = oldPaths.filter((path) => !newPaths.has(path));
-
-      if (pathsToDelete.length > 0) {
-        const admin = createAdminClient();
-        const { error: remErr } = await admin.storage.from("whatsapp-media").remove(pathsToDelete);
-        if (remErr) {
-          logger.warn("[message-templates/patch] Falha ao remover arquivos órfãos do Storage", {
-            paths: pathsToDelete,
-            error: remErr.message,
+      // 3. Com a inserção confirmada, deleta mídias antigas do banco
+      let dbDeleteSuccess = true;
+      if (oldMediaIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from("message_template_media")
+          .delete()
+          .in("id", oldMediaIds)
+          .eq("organization_id", org.orgId);
+        if (delErr) {
+          dbDeleteSuccess = false;
+          logger.warn("[message-templates/patch] Falha ao excluir referências antigas de mídia no banco", {
+            templateId: id,
+            error: delErr.message,
             requestId,
           });
+        }
+      }
+
+      // 4. Limpa do Storage apenas se a exclusão no banco foi confirmada com sucesso
+      if (dbDeleteSuccess) {
+        const newPaths = new Set(media.map((m) => m.storage_path));
+        const pathsToDelete = oldPaths.filter((path) => !newPaths.has(path));
+
+        if (pathsToDelete.length > 0) {
+          const admin = createAdminClient();
+          const { error: remErr } = await admin.storage.from("whatsapp-media").remove(pathsToDelete);
+          if (remErr) {
+            logger.warn("[message-templates/patch] Falha ao remover arquivos órfãos do Storage", {
+              paths: pathsToDelete,
+              error: remErr.message,
+              requestId,
+            });
+          }
         }
       }
     }

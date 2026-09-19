@@ -37,6 +37,7 @@ let creds: Creds;
 let conversaId = "";
 let contatoId = "";
 let templateId = "";
+let storagePath = "";
 const TEMPLATE_TITLE = `Template E2E Mídia ${Date.now()}`;
 const NOME_CONTATO = `Cliente Teste ${Date.now()}`;
 
@@ -58,11 +59,16 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
 
   test.beforeAll(async () => {
     if (!fs.existsSync(CREDS_PATH)) {
-      execFileSync("npx", ["tsx", "scripts/seed-e2e-credentials.ts"], { stdio: "inherit" });
+      execFileSync("node", ["--import", "tsx", "scripts/seed-e2e-credentials.ts"], {
+        stdio: "inherit",
+        env: { ...process.env, ...env },
+      });
     }
-    creds = JSON.parse(fs.readFileSync(CREDS_PATH, "utf8")) as Creds;
+    creds = JSON.parse(fs.readFileSync(CREDS_PATH, "utf-8")) as Creds;
 
-    // Garante canal e contato
+    // Garante que existe canal WAHA e conversa para o teste
+    // Garante canal WAHA em status STOPPED para não tentar conexão externa não mockada
+    let sessionId: string | undefined;
     const { data: session } = await admin
       .from("channel_sessions")
       .select("id")
@@ -70,8 +76,10 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
       .limit(1)
       .maybeSingle();
 
-    let sessionId = session?.id;
-    if (!sessionId) {
+    if (session) {
+      sessionId = session.id;
+      await admin.from("channel_sessions").update({ status: "STOPPED" }).eq("id", sessionId);
+    } else {
       const { data: newSess, error: sessErr } = await admin
         .from("channel_sessions")
         .insert({
@@ -79,7 +87,7 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
           provider: "waha",
           waha_session_name: `e2e_${Date.now()}`,
           webhook_secret_encrypted: "\\x00",
-          status: "WORKING",
+          status: "STOPPED",
         })
         .select("id")
         .single();
@@ -119,6 +127,16 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
 
     const user = (creds.users.owner ?? creds.users.manager ?? creds.users.admin)!;
 
+    // Sobe arquivo real para o bucket whatsapp-media no Storage
+    storagePath = `${creds.org_id}/message-template-media/e2e-demo-${Date.now()}.png`;
+    const fakePng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    await admin.storage
+      .from("whatsapp-media")
+      .upload(storagePath, fakePng, { contentType: "image/png", upsert: true });
+
     // Semeia template com anexo de mídia no banco
     const { data: tpl } = await admin
       .from("message_templates")
@@ -136,15 +154,18 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
     await admin.from("message_template_media").insert({
       template_id: templateId,
       organization_id: creds.org_id,
-      storage_path: `${creds.org_id}/templates/e2e-demo-${Date.now()}.png`,
+      storage_path: storagePath,
       media_mime: "image/png",
-      media_size_bytes: 1024 * 250, // 250KB
+      media_size_bytes: fakePng.length,
       filename: "coworking-mesa-privativa.png",
       position: 0,
     });
   });
 
   test.afterAll(async () => {
+    if (storagePath) {
+      await admin.storage.from("whatsapp-media").remove([storagePath]);
+    }
     if (templateId) {
       await admin.from("message_template_media").delete().eq("template_id", templateId);
       await admin.from("message_templates").delete().eq("id", templateId);
@@ -190,8 +211,9 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
     await login(page, user.email, creds.password);
 
     await page.goto(`/app/inbox/${conversaId}`);
+    await page.waitForSelector("[data-conversation-id]", { timeout: 30_000 }).catch(() => null);
     const savedMsgBtn = page.getByTestId("botao-mensagens-salvas");
-    await expect(savedMsgBtn).toBeVisible({ timeout: 15_000 });
+    await expect(savedMsgBtn).toBeVisible({ timeout: 20_000 });
     await savedMsgBtn.click();
 
     const searchInput = page.getByPlaceholder(/buscar por título, atalho ou texto/i);
@@ -206,10 +228,10 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 15_000 });
     await captura(page, "03-apos-envio-direto");
 
-    // Confere no banco se a mensagem foi gravada com media_storage_path correto
+    // Confere no banco se a mensagem foi gravada com media_storage_path correto e status válido
     const { data: sentMsg } = await admin
       .from("messages")
-      .select("id, type, body, media_storage_path, media_mime")
+      .select("id, type, body, media_storage_path, media_mime, status")
       .eq("conversation_id", conversaId)
       .eq("type", "image")
       .order("created_at", { ascending: false })
@@ -217,7 +239,8 @@ test.describe("J12 — Mensagens Salvas com Mídia no Inbox", () => {
       .single();
 
     expect(sentMsg).toBeTruthy();
-    expect(sentMsg?.media_storage_path).toContain(`${creds.org_id}/templates/`);
+    expect(sentMsg?.media_storage_path).toContain(`${creds.org_id}/message-template-media/`);
     expect(sentMsg?.body).toContain(NOME_CONTATO);
+    expect(sentMsg?.status).not.toBe("failed");
   });
 });

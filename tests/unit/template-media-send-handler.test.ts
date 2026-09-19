@@ -66,12 +66,12 @@ describe("isMediaPathOwnedBy — validação sintática do path", () => {
   });
 
   it("permite mídia de template da mesma org em qualquer conversa da org", () => {
-    expect(isMediaPathOwnedBy(`${orgId}/templates/uuid-1.png`, orgId, convId)).toBe(true);
-    expect(isMediaPathOwnedBy(`${orgId}/templates/sub/video.mp4`, orgId, convId)).toBe(true);
+    expect(isMediaPathOwnedBy(`${orgId}/message-template-media/uuid-1.png`, orgId, convId)).toBe(true);
+    expect(isMediaPathOwnedBy(`${orgId}/message-template-media/sub/video.mp4`, orgId, convId)).toBe(true);
   });
 
   it("bloqueia mídia de template de outra org", () => {
-    expect(isMediaPathOwnedBy("outra-org/templates/uuid-1.png", orgId, convId)).toBe(false);
+    expect(isMediaPathOwnedBy("outra-org/message-template-media/uuid-1.png", orgId, convId)).toBe(false);
   });
 
   it("bloqueia mídia de conversa de outra org ou conversa", () => {
@@ -80,7 +80,7 @@ describe("isMediaPathOwnedBy — validação sintática do path", () => {
   });
 
   it("bloqueia prefixos com confusão de nome", () => {
-    expect(isMediaPathOwnedBy(`${orgId}x/templates/uuid-1.png`, orgId, convId)).toBe(false);
+    expect(isMediaPathOwnedBy(`${orgId}x/message-template-media/uuid-1.png`, orgId, convId)).toBe(false);
     expect(isMediaPathOwnedBy(`${orgId}x/${convId}/foto.jpg`, orgId, convId)).toBe(false);
   });
 });
@@ -91,7 +91,7 @@ describe("sendMessageHandler — Segurança no Envio de Mídia de Template", () 
     vi.unstubAllGlobals();
   });
 
-  const templateStoragePath = `${ORG}/templates/img-123.jpg`;
+  const templateStoragePath = `${ORG}/message-template-media/img-123.jpg`;
 
   it("permite envio de mídia de template compartilhado (owner_user_id = null)", async () => {
     vi.stubEnv("WAHA_API_BASE_URL", "http://localhost:3030");
@@ -215,7 +215,7 @@ describe("sendMessageHandler — Segurança no Envio de Mídia de Template", () 
     const input: SendMessageInput = {
       conversation_id: CONV,
       type: "image",
-      media_storage_path: `outra-org/templates/img-123.jpg`,
+      media_storage_path: `outra-org/message-template-media/img-123.jpg`,
       media_mime: "image/jpeg",
     };
 

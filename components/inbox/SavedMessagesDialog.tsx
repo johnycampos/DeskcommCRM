@@ -41,6 +41,7 @@ export function SavedMessagesDialog({
   const t = useT();
   const [search, setSearch] = React.useState("");
   const [sendingId, setSendingId] = React.useState<string | null>(null);
+  const [sentIndicesMap, setSentIndicesMap] = React.useState<Record<string, number[]>>({});
 
   const { data: templates, isLoading } = useMessageTemplates();
   const send = useSendMessage();
@@ -67,6 +68,7 @@ export function SavedMessagesDialog({
       setSendingId(template.id);
       const interpolatedBody = interpolateTemplate(template.body, { name: contactName ?? null });
       const mediaList = template.media ?? [];
+      const alreadySent = new Set(sentIndicesMap[template.id] ?? []);
 
       if (mediaList.length === 0) {
         // Envio simples de texto
@@ -93,8 +95,9 @@ export function SavedMessagesDialog({
           media_size_bytes: m.media_size_bytes,
         });
       } else {
-        // Múltiplas mídias: 1ª mídia com legenda e as subsequentes em sequência
+        // Múltiplas mídias: pula as que já foram enviadas com sucesso nesta tentativa
         for (let i = 0; i < mediaList.length; i++) {
+          if (alreadySent.has(i)) continue;
           const m = mediaList[i];
           if (!m) continue;
           const kind = m.media_mime.startsWith("video/")
@@ -111,13 +114,26 @@ export function SavedMessagesDialog({
             media_mime: m.media_mime,
             media_size_bytes: m.media_size_bytes,
           });
+
+          alreadySent.add(i);
+          setSentIndicesMap((prev) => ({
+            ...prev,
+            [template.id]: Array.from(alreadySent),
+          }));
         }
       }
+
+      // Limpa rastreamento ao concluir envio com sucesso
+      setSentIndicesMap((prev) => {
+        const next = { ...prev };
+        delete next[template.id];
+        return next;
+      });
 
       toast.success(t("Mensagem salva enviada ao cliente."));
       onOpenChange(false);
     } catch {
-      // Erro reportado pelo toast do send
+      // Erro reportado pelo toast do send; o estado já guardou as mídias enviadas para não duplicar no retry
     } finally {
       setSendingId(null);
     }

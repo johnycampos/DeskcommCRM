@@ -481,7 +481,7 @@ export async function sendMessageHandler(
 
   if (
     input.media_storage_path &&
-    input.media_storage_path.startsWith(`${c.organization_id}/templates/`)
+    input.media_storage_path.startsWith(`${c.organization_id}/message-template-media/`)
   ) {
     const { data: tm, error: tmErr } = await supabase
       .from("message_template_media")

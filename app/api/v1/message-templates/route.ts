@@ -85,6 +85,14 @@ export async function POST(req: NextRequest): Promise<Response> {
     return fail("forbidden", t("Só manager+ cria template compartilhado."), 403, { requestId });
   }
 
+  if (media && media.length > 0) {
+    for (const m of media) {
+      if (!m.storage_path.startsWith(`${org.orgId}/message-template-media/`)) {
+        return fail("validation_failed", t("storage_path de mídia inválido ou fora da organização."), 422, { requestId });
+      }
+    }
+  }
+
   // Idempotency-Key, quando vem, tem de ser UUID — mesma régua de
   // `admin/tenants` e do contrato (spec 01 §7.3). Chave malformada não vira
   // recibo: recusar cedo é mais honesto que gravar lixo e devolver 201.

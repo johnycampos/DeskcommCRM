@@ -2,7 +2,14 @@ import { z } from "zod";
 
 export const templateMediaInputSchema = z.object({
   id: z.string().uuid().optional(),
-  storage_path: z.string().trim().min(1),
+  storage_path: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(
+      /^[0-9a-fA-F-]{36}\/message-template-media\/[0-9a-fA-F-]{36}\.[a-zA-Z0-9]+$/,
+      "storage_path inválido para mídia de template (esperado: {orgId}/message-template-media/{uuid}.{ext})",
+    ),
   media_mime: z
     .string()
     .trim()
