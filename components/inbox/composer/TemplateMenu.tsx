@@ -47,7 +47,7 @@ export function TemplateMenu({ open, query, templates, onPick, onClose: _onClose
               <div className="flex w-full items-center justify-between gap-2">
                 <span className="text-sm font-medium">{tpl.title}</span>
                 {mediaCount > 0 && (
-                  <span className="flex items-center gap-1 rounded bg-muted/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1 rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     <ImageIcon className="size-2.5" />
                     {mediaCount}
                   </span>

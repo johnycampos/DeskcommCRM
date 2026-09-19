@@ -219,7 +219,7 @@ export function SavedMessagesDialog({
                         return (
                           <div
                             key={m.storage_path || idx}
-                            className="flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                            className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
                           >
                             {isImg ? (
                               <ImageIcon className="size-3 text-primary" />

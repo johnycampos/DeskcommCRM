@@ -239,7 +239,7 @@ export function TemplateFormDialog({ open, onOpenChange, canShare, template }: P
                             <img
                               src={m.url}
                               alt={m.filename || "Imagem"}
-                              className="size-10 rounded object-cover border border-border"
+                              className="size-10 rounded-md object-cover border border-border"
                             />
                           ) : (
                             <ImageIcon className="size-5 text-primary shrink-0" />

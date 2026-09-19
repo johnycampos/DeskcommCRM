@@ -1,4 +1,4 @@
--- 0343: anexo de mídia (imagens e vídeos) em templates de mensagem (Top Coworking).
+-- 0345: anexo de mídia (imagens e vídeos) em templates de mensagem (Top Coworking).
 -- Cada template pode ter N mídias hospedadas no bucket whatsapp-media.
 -- RLS espelha estritamente message_templates: leitura por membros da org para
 -- templates compartilhados ou próprios; escrita por agent (próprio) ou manager (compartilhado).

@@ -1,4 +1,4 @@
--- 0233: fn_expurgar_nonces_de_oauth nasceu (migration 0190) com parâmetros
+-- 0343: fn_expurgar_nonces_de_oauth nasceu (migration 0190) com parâmetros
 -- `p_dias, p_lote` — diferente das três irmãs de retenção
 -- (`fn_podar_fila_de_jobs`, `fn_expurgar_auditoria_vencida`,
 -- `fn_expurgar_espelho_da_agenda`), que usam `p_retencao_dias, p_limite`.

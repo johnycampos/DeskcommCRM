@@ -32461,7 +32461,7 @@ update public.contacts c
 
 notify pgrst, 'reload schema';
 
--- ---- message_template_media: mídias anexadas a templates de mensagens (migration 0343) ----
+-- ---- message_template_media: mídias anexadas a templates de mensagens (migration 0345) ----
 create table if not exists public.message_template_media (
   id uuid primary key default gen_random_uuid(),
   template_id uuid not null references public.message_templates(id) on delete cascade,

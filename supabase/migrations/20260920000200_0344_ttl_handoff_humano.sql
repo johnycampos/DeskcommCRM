@@ -1,4 +1,4 @@
--- 0234 — TTL de 2 horas no handoff humano: "Assumir" cala o automático com prazo
+-- 0344 — TTL de 2 horas no handoff humano: "Assumir" cala o automático com prazo
 -- finito, impedindo que esquecimento do atendente silencie o cliente para sempre.
 --
 -- ## O defeito
