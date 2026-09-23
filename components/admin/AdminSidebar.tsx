@@ -19,6 +19,8 @@ import {
   Plugs,
   WebhooksLogo,
   ArrowRight,
+  Lock,
+  PuzzlePiece,
 } from "@/lib/ui/icons";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -75,6 +77,26 @@ const NAV_ITEMS: NavItem[] = [
   // decisão pede explicitamente que o lugar onde o dono controla seja visível.
   // Sem esta linha a tela existiria e só se chegaria nela digitando a URL.
   { href: "/admin/destinos-internos", label: "Destinos internos", icon: Plugs },
+  // A porta das CREDENCIAIS da instalação (migration 0341): a chave do serviço
+  // de e-mail, o remetente, os contatos — o que antes só se trocava por SSH.
+  //
+  // ⚠️ RÓTULO E ÍCONE ESCOLHIDOS CONTRA A VIZINHA DE CIMA. A tela
+  // "Comportamento" (/admin/sistema, issue #1034) nasceu em paralelo e usa
+  // `Gear`. Uma segunda engrenagem chamada "Configuração" ao lado dela deixaria
+  // o operador sem saber qual abrir — "comportamento" e "configuração" são quase
+  // sinônimos para quem não programa. "Credenciais" diz o que tem lá dentro, e
+  // o cadeado diz que é algo guardado.
+  { href: "/admin/configuracao", label: "Credenciais", icon: Lock },
+  // A PORTA QUE FALTAVA. O catálogo de extensões é da INSTALAÇÃO
+  // (`extension_catalogs` não tem `organization_id`), mas a única tela que o
+  // mostrava vivia no menu da EMPRESA — o dono do servidor precisava entrar
+  // numa organização qualquer para ver de onde vêm as extensões do servidor
+  // dele. Mesma divisão errada que o DEC-009 achou no e-mail.
+  //
+  // `PuzzlePiece` é o mesmo ícone da entrada de Extensões no menu da empresa
+  // (`lib/navigation/catalogo.ts`), de propósito: são duas vistas do mesmo
+  // assunto, e ícones diferentes fariam parecer dois assuntos.
+  { href: "/admin/extensoes", label: "Extensões", icon: PuzzlePiece },
 ];
 
 interface AdminSidebarProps {

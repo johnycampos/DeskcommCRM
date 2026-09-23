@@ -804,6 +804,12 @@ type CategoriaDeHost =
 type EntradaDeHost = { categoria: CategoriaDeHost; motivo: string };
 
 const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
+  // ── prospecção (PR #963): destino de chamada do crawler ──
+  "api.apify.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "endpoint da plataforma que roda o crawler do Google Places (`lib/prospecting/provider.ts`). É o destino do request, com a chave da PRÓPRIA organização — trocar pelo domínio do revendedor quebraria a chamada, e esconder o nome não esconde para onde o dado vai.",
+  },
   // ── identificador de fio: NÃO é destino de chamada nem texto de tela ──────
   "s.whatsapp.net": {
     categoria: "PROTOCOLO",
@@ -874,6 +880,11 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     categoria: "FORNECEDOR",
     motivo:
       "endpoint padrão do adapter do canal de mensagens, com override por ZERNIO_API_BASE_URL. Fixo de propósito: instalação que não configura nada tem de funcionar.",
+  },
+  "cloud.datafyapi.com.br": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "endpoint padrão do canal parceiro que espelha a Cloud API (recorte do #1130), com override por DATAFY_API_BASE_URL. É o destino das chamadas de envio e de validação do token — e o canal só existe numa instalação que o liga (DATAFY_ENABLED).",
   },
   // ── painel do fornecedor: texto de tela apontando para o endereço DELE ────
   "platform.openai.com": {
